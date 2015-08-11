@@ -5,3 +5,5 @@ configurability for specific purposes. If a client does not want to host a softw
 then it should leave out the plugin cooperation ability so as to prevent malware, and then in
 later versions if a 3rd party is willing to host a reliable repository this repository should be
 shipped with the software.
+
+ALL TEXT MUST BE IN UTF-8 FORMAT.
