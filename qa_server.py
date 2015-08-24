@@ -95,6 +95,11 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
             return int(length_portion[length_start:-2])
 
         def select_and_handle_msg(self, message):
+            try:
+                json_message = json.loads(message)
+            except ValueError:
+                raise JSONDecodeError(message)
+            #json_message["type"]
             pass
 
         
@@ -130,6 +135,14 @@ class InvalidMessageDelimiter(MessageDelimiterError):
     """Error raised when a message delimiter appears to be present but
     garbled."""
     pass
+
+class JSONDecodeError(Exception):
+    """Error raised when a json encoded message fails to decode to a valid JSON
+    document."""
+    def __init__(self, invalid_json="JSON not given."):
+        self.invalid_json = invalid_json
+    def __str__(self):
+        return repr(self.invalid_json)
 
 
 if __name__ == '__main__':
