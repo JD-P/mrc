@@ -272,9 +272,9 @@ class JSONDecodeError(Exception):
 
 
 if __name__ == '__main__':
-    PubSub = threading.Thread(target=PublishSubscribe())
+    PubSub = threading.Thread(target=PublishSubscribe)
 
-    PubSub.run()
+    PubSub.start()
 
     HOST, PORT = "localhost", 9665
     
