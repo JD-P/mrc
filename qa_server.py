@@ -3,6 +3,50 @@ import threading
 import queue
 import json
 
+class PublishSubscribe():
+    """Publish Subscribe mechanism for the QA system.
+
+    Each thread spawned by the QAServer registers itself with an instance of this
+    class by calling its subscribe() method with itself as an argument and 
+    associated logon info. When a thread wants to send a message to the room it 
+    is put into a central queue using the send_pubmsg() method of this class which 
+    puts it into a FIFO queue. PublishSubscribe runs in its own thread and pulls
+    each of these messages from the queue and timestamps them in utc before sending
+    them to each relevant subscriber in the subscription list.
+    """
+    def __init__(self):
+        self.Subscriptions = {}
+        self.Messages = queue.Queue()
+        self.pub_sub_loop()
+
+    def subscribe(self, connection, logon_info):
+        """Add a QAServer <connection> to the subscriber list with the logon info
+        given in the dictionary <logon_info>."""
+        self.Subscriptions[connection] = logon_info
+        return True
+
+    def send_pubmsg(self, message):
+        """Put a <message> into the publish queue."""
+        self.Messages.put(message)
+        return True
+
+    def pub_sub_loop(self):
+        message = self.Messages.get()
+        message["timestamp"] = None # Need to add later.
+        json_message = json.dumps(message)
+        utf8_message = json_message.encode("utf-8")
+        for subscriber in self.Subscriptions:
+            if "muted" in self.Subscriptions[subscriber]["user_info"]["privileges"]:
+                muted = self.Subscriptions[subscriber]["user_info"]["privileges"]
+                if muted:
+                    break #TODO: Make this send a message back to the client that
+                          # their message was not sent.
+                else:
+                    pass
+            else:
+                subscriber.put_msg(message)
+        
+
 class QAServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     """Questions and answer server for demonstrations in a computer lab.
 
@@ -40,13 +84,52 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
         should be handled by waiting several minutes for the client to recover
         before cutting the cord.
         """
+        send_queue = queue.Queue() # The message output queue
+        user_info = {"name":None, "privileges":None}
+        server_info = {"protocol":None, "client":None}
+
         def handle(self):
-            """Handle a QA connection."""
-            # Initialize the connection and get necessary client info
-            name = None
-            msg_buffer = bytes()
+            """Handle a QA connection.
+
+            Messages are taken in by an input buffer 1024 bytes at a time until
+            they are fully recieved. All messages are JSON documents. Once a 
+            message has been recieved by the server it is sent to select_and_handle_msg()
+            to be parsed as JSON and then passed on to a message handler. The
+            selector knows which handler to invoke by the messages 'type' value.
+            The name of a handler is always 'handle_' with the type of the message
+            appended. 
+
+            The first handler invoked on each connection is the handle_logon()
+            method. The handle_logon() method initializes a connection, setting
+            its privileges and registering client information.
+
+            The QA system only supports one chatroom on-server. Each public
+            message sent to the server is handled by the handle_pubmsg() method
+            which puts messages into the PublishSubscribe system. The Publish
+            Subscribe system keeps a queue of all messages to be sent to clients
+            and a subscriber list. Each message in the queue is put in every 
+            clients send queue.
+
+            The mainloop for each client connection handles both input and output.
+            Input is prioritized over output so that if the room is flooded by a
+            malicious client an administrator can send the messages to the server
+            necessary to silence them.
+
+            The QA system also supports sending images to the room. When an image
+            is sent to the room it is only sent to administrators. This is because
+            the actual intended use of this feature is to send screenshots to the
+            instructor of the computer lab. For example if you are demonstrating
+            a piece of software and the demonstration is based on the state of the
+            software at a given time, a screenshot can be sent to the instructor
+            so he can see the state without having to get up and look. Images
+            are encoded as base64 so that they can be sent as JSON documents.
+            """
+            msg_buffer = bytes() # The message input buffer
             while 1:
-                if msg_buffer:
+                if not self.send_queue.empty():
+                    utf8_message = self.send_queue.get()
+                    self.send_msg(utf8_message)
+                elif msg_buffer:
                     msg_length = self.determine_length_of_json_msg(msg_buffer)
                     if len(msg_buffer) >= msg_length:
                         message = self.extract_msg(msg_buffer, msg_length)
@@ -94,13 +177,56 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
                 raise MissingLengthHeader(length_portion)
             return int(length_portion[length_start:-2])
 
+        def put_msg(self, utf8_message):
+            """Put a message into the connections send queue."""
+            self.send_queue.put(utf8_message)
+
+        def send_msg(self, utf8_message):
+            """Send a message that the connection mainloop has in its send queue."""
+            while utf8_message:
+                try:
+                    sent = self.request.send(utf8_message)
+                except timeout:
+                    self.handle_quit("Timeout occurred.")
+                utf8_message = utf8_message[sent:]
+            return True
+
         def select_and_handle_msg(self, message):
             try:
                 json_message = json.loads(message)
             except ValueError:
                 raise JSONDecodeError(message)
-            #json_message["type"]
+            msg_type = json_message["type"]
+            handler = getattr(self, "handle_" + msg_type)
+            handler(json_message)
+            return True
+
+        def handle_logon(self, message):
+            """Handles an initial client connection to the server.
+
+            user_info: Information about the user such as username, realname and
+            submitted passwords.
+
+            server_info: Information *for* the server not *about* it.
+            The reason why it's named like this is that future extensions and
+            variants of this protocol will store information besides client
+            info here such as preferences for a chat matchmaking system.
+            """
+            self.user_info.update(message["user"])
+            self.server_info.update(message["server"]) 
+            PubSub.subscribe(self, {"user_info":self.user_info, 
+                                    "server_info":self.server_info})
+            return True
+
+        def handle_pubmsg(self, message):
+            """Handle a public message sent to the single QA room."""
+            PubSub.send_pubmsg(message)
+            return True
+
+        def handle_quit(self, timout_msg):
+            """Handle a connection quitting or timing out."""
             pass
+            
 
         
 class StreamError(Exception):
@@ -146,6 +272,10 @@ class JSONDecodeError(Exception):
 
 
 if __name__ == '__main__':
+    PubSub = threading.Thread(target=PublishSubscribe())
+
+    PubSub.run()
+
     HOST, PORT = "localhost", 9665
     
     server = QAServer((HOST, PORT), MRCStreamHandler)
