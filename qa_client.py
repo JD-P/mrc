@@ -175,9 +175,6 @@ class SendLoop():
 
 class RecieveLoop():
     pass
-
-class ThreadPubSub():
-    """Publish/Subscribe system for threaded objects implementing input queue's."""
     
 
 class QAClientGUI(QtGui.QApplication):
