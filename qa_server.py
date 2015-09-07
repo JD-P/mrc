@@ -15,6 +15,8 @@ class PublishSubscribe():
     them to each relevant subscriber in the subscription list.
     """
     def __init__(self):
+        global PubSub
+        PubSub = self
         self.Subscriptions = {}
         self.Messages = queue.Queue()
         self.pub_sub_loop()
@@ -31,20 +33,37 @@ class PublishSubscribe():
         return True
 
     def pub_sub_loop(self):
-        message = self.Messages.get()
-        message["timestamp"] = None # Need to add later.
-        json_message = json.dumps(message)
-        utf8_message = json_message.encode("utf-8")
-        for subscriber in self.Subscriptions:
-            if "muted" in self.Subscriptions[subscriber]["user_info"]["privileges"]:
-                muted = self.Subscriptions[subscriber]["user_info"]["privileges"]
+        """
+        Main Publish Subscribe loop for MRC.
+
+        This loop runs in a seperate thread of execution. It takes items from a
+        push queue which is filled through a method of this object send_pubmsg().
+        
+        Messages are sent with their associated connection in a tuple of the form
+        (message, connection). This connection has its privileges checked before 
+        publish time. If the connection has a privilege setting effecting its 
+        ability to publish such as being muted that is handled here.
+
+        The message is grabbed, then the privilege checks are applied, finally
+        if applicable the message is sent to the entire subscriber list.
+        """
+        while True:
+            message_tuple = self.Messages.get()
+            message = message_tuple[0]
+            connection = message_tuple[1]
+            message["timestamp"] = None # Need to add later.
+            if not message["name"]:
+                continue
+            json_message = json.dumps(message)
+            utf8_message = json_message.encode("utf-8")
+            if "muted" in self.Subscriptions[connection]["user_info"]["privileges"]:
+                muted = self.Subscriptions[connection]["user_info"]["privileges"]["muted"]
                 if muted:
-                    break #TODO: Make this send a message back to the client that
-                          # their message was not sent.
+                        continue #TODO: Make this send a message back to the client that
+                              # their message was not sent.
                 else:
-                    pass
-            else:
-                subscriber.put_msg(message)
+                    for subscriber in self.Subscriptions:
+                        subscriber.put_msg(utf8_message)
         
 
 class QAServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
@@ -142,16 +161,18 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
                         
 
         def extract_msg(self, msg_buffer, length):
-            message = msg_buffer[:length + 1]
-            utf8_message = str(message, 'utf-8')
-            right_curly_bracket = utf8_message[-5] == "}"
-            valid_delimiter = utf8_message[-5:] == "}\r\n\r\n"
+            message = msg_buffer[:length].decode()
+            try:
+                right_curly_bracket = message[-6] == "}" or message[-2] == "}"
+            except IndexError:
+                print(message, msg_buffer)
+            valid_delimiter = message[-6:] == "}]\r\n\r\n"
             if right_curly_bracket and valid_delimiter:
-                return utf8_message
+                return message
             elif right_curly_bracket:
-                raise InvalidMessageDelimiter(utf8_message)
+                raise InvalidMessageDelimiter(message)
             else:
-                raise MissingMessageDelimiter(utf8_message)
+                raise MissingMessageDelimiter(message)
 
         def determine_length_of_json_msg(self, message_bytes):
             """Incrementally parse a JSON message to extract the length header.
@@ -164,7 +185,7 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
             # Check that the message we have been given looks like a valid length header
             length_portion = msg_utf8.split(",")[0]
             left_bracket = length_portion[0] == "["
-            number_before_comma = length_portion[-2] in "1234567890"
+            number_before_comma = length_portion[-1] in "1234567890"
             if left_bracket and number_before_comma:
                 for character in enumerate(length_portion):
                     if character[1] not in "[ \n\t\r1234567890,":
@@ -175,7 +196,7 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
                 raise InvalidLengthHeader(length_portion)
             else:
                 raise MissingLengthHeader(length_portion)
-            return int(length_portion[length_start:-2])
+            return int(length_portion[length_start:])
 
         def put_msg(self, utf8_message):
             """Put a message into the connections send queue."""
@@ -220,12 +241,13 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
 
         def handle_pubmsg(self, message):
             """Handle a public message sent to the single QA room."""
-            PubSub.send_pubmsg(message)
+            message["name"] = self.user_info["name"]
+            PubSub.send_pubmsg((message, self))
             return True
 
         def handle_quit(self, timout_msg):
             """Handle a connection quitting or timing out."""
-            pass
+            self.request.close()
             
 
         
@@ -272,9 +294,9 @@ class JSONDecodeError(Exception):
 
 
 if __name__ == '__main__':
-    PubSub = threading.Thread(target=PublishSubscribe)
+    PubSubThread = threading.Thread(target=PublishSubscribe)
 
-    PubSub.start()
+    PubSubThread.start()
 
     HOST, PORT = "localhost", 9665
     
