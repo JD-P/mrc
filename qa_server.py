@@ -165,7 +165,7 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
             try:
                 right_curly_bracket = message[-6] == "}" or message[-2] == "}"
             except IndexError:
-                print(message, msg_buffer)
+                print(message, msg_buffer, length)
             valid_delimiter = message[-6:] == "}]\r\n\r\n"
             if right_curly_bracket and valid_delimiter:
                 return message
