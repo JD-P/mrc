@@ -180,10 +180,10 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
             message_bytes: The bytes that represent the portion of the message 
             recieved.
             """
-            # All messages must be sent in utf-8
-            msg_utf8 = str(message_bytes, 'utf-8')
+            # All messages must be written in utf-8
+            message = message_bytes.decode('utf-8')
             # Check that the message we have been given looks like a valid length header
-            length_portion = msg_utf8.split(",")[0]
+            length_portion = message.split(",")[0]
             left_bracket = length_portion[0] == "["
             number_before_comma = length_portion[-1] in "1234567890"
             if left_bracket and number_before_comma:
@@ -192,11 +192,13 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
                         raise InvalidLengthHeader(length_portion)
                     elif character[1] in "1234567890":
                         length_start = character[0]
+                        return int(length_portion[length_start:])
             elif left_bracket:
                 raise InvalidLengthHeader(length_portion)
             else:
                 raise MissingLengthHeader(length_portion)
-            return int(length_portion[length_start:])
+            return False
+            
 
         def put_msg(self, utf8_message):
             """Put a message into the connections send queue."""
