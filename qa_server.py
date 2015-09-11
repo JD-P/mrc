@@ -215,8 +215,20 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
             return True
 
         def select_and_handle_msg(self, message):
+            """
+            Generic message handler.
+
+            This function takes a text message extracted by the program mainloop
+            and further extracts the message dictionary from the list which
+            contains it and the length header. After this has been accomplished
+            the message dictionary's 'type' key is read to find out which handler
+            should be passed this mesasge. The handler to be passed is defined
+            as a method of this class with the prefix "handle_" and then the type
+            of message appened. For example to handle a 'pubmsg' you would call
+            handle_pubmsg().
+            """
             try:
-                json_message = json.loads(message)
+                json_message = json.loads(message)[1] 
             except ValueError:
                 raise JSONDecodeError(message)
             msg_type = json_message["type"]
@@ -236,7 +248,8 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
             info here such as preferences for a chat matchmaking system.
             """
             self.user_info.update(message["user"])
-            self.server_info.update(message["server"]) 
+            self.server_info.update(message["server"])
+            print("LOGON REACHED!")
             PubSub.subscribe(self, {"user_info":self.user_info, 
                                     "server_info":self.server_info})
             return True
