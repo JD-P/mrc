@@ -111,18 +111,16 @@ class QAClientLogic():
     def _calculate_recursive_length(self, json_dict):
         """Calculate the length of a dictionary represented as JSON once a length
         field has been added as a key."""
+        delimiter = "\r\n\r\n"
         initial_length = len(
-            json.dumps(
-                json_dict))
+            json.dumps(json_dict) + delimiter)
         initial_list = [initial_length, json_dict]
         recursive_length = len(
-            json.dumps(
-                initial_list))
+            json.dumps(initial_list) + delimiter)
         recursive_list = [recursive_length, json_dict]
-        while len(json.dumps(recursive_list)) != recursive_list[0]:
+        while len(json.dumps(recursive_list) + delimiter) != recursive_list[0]:
             recursive_length = len(
-                json.dumps(
-                    recursive_list))
+                json.dumps(recursive_list) + delimiter)
             recursive_list = [recursive_length, json_dict]
         return recursive_list[0]
 
@@ -154,7 +152,7 @@ class SendLoop():
         """
         while True:
             message = self.send_queue.get()
-            json_message = json.dumps(message)
+            json_message = json.dumps(message) + '\r\n\r\n'
             utf8_message = json_message.encode("utf-8")
             self.send_msg(connection, utf8_message)
             
@@ -185,7 +183,8 @@ class QAClientGUI(QtGui.QApplication):
 class DebugMenu(cmd.Cmd):
     def do_test_connection(self, hostname):
         logic = QAClientLogic()
-        logic.make_connection(hostname=hostname)
+        fail = logic.make_connection(hostname=hostname)
+        print(fail)
 
     def do_logon(self, hostname):
         logic = QAClientLogic()
