@@ -52,10 +52,8 @@ class PublishSubscribe():
             message = message_tuple[0]
             connection = message_tuple[1]
             message["timestamp"] = None # Need to add later.
-            if not message["name"]:
+            if not message["name"]: # Reject messages from clients which have not logged in
                 continue
-            json_message = json.dumps(message)
-            utf8_message = json_message.encode("utf-8")
             if "muted" in self.Subscriptions[connection]["user_info"]["privileges"]:
                 muted = self.Subscriptions[connection]["user_info"]["privileges"]["muted"]
                 if muted:
@@ -63,7 +61,7 @@ class PublishSubscribe():
                               # their message was not sent.
                 else:
                     for subscriber in self.Subscriptions:
-                        subscriber.put_msg(utf8_message)
+                        subscriber.put_msg(message)
         
 
 class QAServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
@@ -198,14 +196,33 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
             else:
                 raise MissingLengthHeader(length_portion)
             return False
+
+        def _calculate_recursive_length(self, json_dict):
+            """Calculate the length of a dictionary represented as JSON once a length
+            field has been added as a key."""
+            delimiter = "\r\n\r\n"
+            initial_length = len(
+                json.dumps(json_dict) + delimiter)
+            initial_list = [initial_length, json_dict]
+            recursive_length = len(
+                json.dumps(initial_list) + delimiter)
+            recursive_list = [recursive_length, json_dict]
+            while len(json.dumps(recursive_list) + delimiter) != recursive_list[0]:
+                recursive_length = len(
+                    json.dumps(recursive_list) + delimiter)
+                recursive_list = [recursive_length, json_dict]
+            return recursive_list[0]
             
 
         def put_msg(self, utf8_message):
             """Put a message into the connections send queue."""
             self.send_queue.put(utf8_message)
 
-        def send_msg(self, utf8_message):
+        def send_msg(self, message):
             """Send a message that the connection mainloop has in its send queue."""
+            message_tuple = [self._calculate_recursive_length(message), message]
+            json_message = json.dumps(message_tuple)
+            utf8_message = json_message.encode('utf-8')
             while utf8_message:
                 try:
                     sent = self.request.send(utf8_message)
