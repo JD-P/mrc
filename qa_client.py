@@ -29,13 +29,14 @@ class QAClientLogic():
             self.confpath = os.path.join(os.environ['APPDATA'] + "mrc\\qa_system\\",
                                          "client\\settings.conf")
         self.registry = {}
+        self.pubmsg_queue = queue.Queue()
 
     def make_connection(self, hostname=None, port=9665):
         """Make a connection to a given host. If host not given make a connection
         to the address specified in the config file."""
         # Try connecting to given host
         try:
-            connection = socket.create_connection((hostname, port))
+            self.connection = socket.create_connection((hostname, port))
         except socket.error:
             # If failure, open config file and get host from there
             try:
@@ -47,27 +48,67 @@ class QAClientLogic():
             config = json.load(config_file)
             # Try connecting with new host
             try:
-                connection = socket.create_connection(
+                self.connection = socket.create_connection(
                     (config["client"]["default_host"], port))
             except socket.error:
                 # If failure, unrecoverable error and return to parent
                 return False
         # If connection succeeds, create input and output threads
-        logon_msg = self.build_initial_connect_msg()
+        self.instantiate_components(self.connection)
+        return True
+
+    def instantiate_components(self, connection):
+        """
+        Instantiate the components used by the logic instance and then wait for
+        them to register with the instance.
+        """
+        self.Sender_reg = threading.Event()
         send_loop = threading.Thread(target=SendLoop, args=(self, connection))
         send_loop.start()
-        while True:
-            try:
-                self.registry["Sender"].put_msg(logon_msg)
-            except KeyError:
-                pass
-            break
+        self.Sender_reg.wait()
+        self.Receiver_reg = threading.Event()
+        receive_loop = threading.Thread(target=ReceiveLoop, args=(self, connection))
+        receive_loop.start()
+        self.Receiver_reg.wait()
+        return True
 
     def register(self, component, provider):
         """Register a <provider> as the object which acts as <component> for this
         instance of the client logic."""
         self.registry[component] = provider
+        signal = getattr(self, component + "_reg")
+        signal.set()
+        return True
+
+    def logon(self):
+        """
+        Logon to the server.
+        """
+        logon_msg = self.build_initial_connect_msg()
+        self.registry["Sender"].put_msg(logon_msg)
+        return True
+
+    def pubmsg(self, message_text):
+        """
+        Send a pubmsg to the server over this connection.
+        """
+        json_dict = {"type":"pubmsg", "msg":message_text}
+        message = [self._calculate_recursive_length(json_dict), json_dict]
+        self.registry["Sender"].put_msg(message)
+        return True
+
+    def get_pubmsg(self):
+        """Get and return a pubmsg from the logic instances pubmsg queue."""
+        return self.pubmsg_queue.get()
+
+    def put_pubmsg(self, message):
+        """Put a pubmsg from a ReceieveLoop into the logic instances pubmsg queue.
         
+        Pubmsg's are pulled from their underlying logic instance by the client 
+        interface and displayed to the user.
+        """
+        self.pubmsg_queue.put(message)
+        return True
 
     def _mkconfig(self, confpath):
         """Create a configuration file in the specified platform directory."""
@@ -142,7 +183,7 @@ class SendLoop():
 
     def loop_forever(self, connection):
         """
-        The mainloop for the thread.
+        The mainloop for the SendLoop thread.
 
         A method is provided for other threads to add items to a queue maintained 
         by this object. This method continually grabs items from that queue and
@@ -171,8 +212,69 @@ class SendLoop():
         """Put a message into the clients send queue."""
         self.send_queue.put(message)
 
-class RecieveLoop():
-    pass
+class ReceiveLoop():
+    """
+    Manages messages sent from the server to the client.
+    """
+    def __init__(self, logic_instance, connection):        
+        logic_instance.register("Receiver", self)
+        self.loop_forever(logic_instance, connection)
+
+    def loop_forever(self, logic_instance, connection):
+        """The mainloop for the ReceiveLoop thread.
+
+        """
+        msg_buffer = bytes() # The message input buffer
+        while 1:
+            if msg_buffer:
+                msg_length = self.determine_length_of_json_msg(msg_buffer)
+                if len(msg_buffer) >= msg_length:
+                    message = self.extract_msg(msg_buffer, msg_length)
+                    logic_instance.put_pubmsg(message)
+                    msg_buffer = msg_buffer[msg_length + 1:]
+                else:
+                    msg_buffer += connection.recv(1024)
+            else:
+                msg_buffer += connection.recv(1024)
+
+    def determine_length_of_json_msg(self, msg_buffer):
+        """Incrementally parse a JSON message to extract the length header.
+
+        message_bytes: The bytes that represent the portion of the message 
+        recieved.
+        """
+        # All messages must be written in utf-8
+        message = message_bytes.decode('utf-8')
+        # Check that the message we have been given looks like a valid length header
+        length_portion = message.split(",")[0]
+        left_bracket = length_portion[0] == "["
+        number_before_comma = length_portion[-1] in "1234567890"
+        if left_bracket and number_before_comma:
+            for character in enumerate(length_portion):
+                if character[1] not in "[ \n\t\r1234567890,":
+                    raise InvalidLengthHeader(length_portion)
+                elif character[1] in "1234567890":
+                    length_start = character[0]
+                    return int(length_portion[length_start:])
+        elif left_bracket:
+            raise InvalidLengthHeader(length_portion)
+        else:
+            raise MissingLengthHeader(length_portion)
+        return False
+
+    def extract_msg(self, msg_buffer, length):
+        message = msg_buffer[:length].decode()
+        try:
+            right_curly_bracket = message[-6] == "}" or message[-2] == "}"
+        except IndexError:
+            print(message, msg_buffer, length)
+        valid_delimiter = message[-6:] == "}]\r\n\r\n"
+        if right_curly_bracket and valid_delimiter:
+            return message
+        elif right_curly_bracket:
+            raise InvalidMessageDelimiter(message)
+        else:
+            raise MissingMessageDelimiter(message)
     
 
 class QAClientGUI(QtGui.QApplication):
@@ -186,14 +288,47 @@ class DebugMenu(cmd.Cmd):
         fail = logic.make_connection(hostname=hostname)
         print(fail)
 
+    def do_connect(self, hostname):
+        self.logic = QAClientLogic()
+        fail = self.logic.make_connection(hostname=hostname)
+        if fail is False:
+            print(fail)
+        else:
+            print("Connection Made")
+
     def do_logon(self, hostname):
-        logic = QAClientLogic()
-        self.connection = logic.make_connection(hostname=hostname)
-        self.connection.logon()
+        self.logic.logon()
+
+    def do_pubmsg(self, message_text):
+        self.logic.pubmsg(message_text)
+
+    def do_pull_pubmsg(self, arg):
+        """Pull a pubmsg off the stack."""
+        self.logic.get_pubmsg()
 
 class ConfigurationError(Exception):
     """Error raised when the client is configured improperly and it is not 
     recoverable."""
+    pass
+
+class StreamError(Exception):
+    """Errors related to handling MRC streams."""
+    pass
+
+class LengthHeaderError(StreamError):
+    """Abstract length header error class."""
+    def __init__(self, length_portion="Portion not given"):
+        self.length_portion = length_portion
+    def __str__(self):
+        return repr(self.length_portion)
+
+class MissingLengthHeader(LengthHeaderError):
+    """Error raised when a length header appears to be missing."""
+    pass
+
+class InvalidLengthHeader(LengthHeaderError):
+    """Error raised when a length header appears to be present but
+    garbled."""
     pass
 
 debug = DebugMenu()
