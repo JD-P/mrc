@@ -54,6 +54,7 @@ class QAClientLogic():
                 # If failure, unrecoverable error and return to parent
                 return False
         # If connection succeeds, create input and output threads
+        self.connection.settimeout(.5)
         self.instantiate_components(self.connection)
         return True
 
@@ -233,11 +234,17 @@ class ReceiveLoop():
                     logic_instance.put_pubmsg(message)
                     msg_buffer = msg_buffer[msg_length + 1:]
                 else:
-                    msg_buffer += connection.recv(1024)
+                    try:
+                        msg_buffer += connection.recv(1024)
+                    except connection.timeout:
+                        pass
             else:
-                msg_buffer += connection.recv(1024)
+                try:
+                    msg_buffer += connection.recv(1024)
+                except connection.timeout:
+                    pass
 
-    def determine_length_of_json_msg(self, msg_buffer):
+    def determine_length_of_json_msg(self, message_bytes):
         """Incrementally parse a JSON message to extract the length header.
 
         message_bytes: The bytes that represent the portion of the message 
