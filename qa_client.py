@@ -54,7 +54,6 @@ class QAClientLogic():
                 # If failure, unrecoverable error and return to parent
                 return False
         # If connection succeeds, create input and output threads
-        self.connection.settimeout(.5)
         self.instantiate_components(self.connection)
         return True
 
@@ -204,7 +203,7 @@ class SendLoop():
         while utf8_message:
             try:
                 sent = connection.send(utf8_message)
-            except connection.timeout:
+            except socket.timeout:
                 self.handle_quit("Timeout occurred.")
             utf8_message = utf8_message[sent:]
         return True
@@ -232,16 +231,17 @@ class ReceiveLoop():
                 if len(msg_buffer) >= msg_length:
                     message = self.extract_msg(msg_buffer, msg_length)
                     logic_instance.put_pubmsg(message)
+                    print("Message put into queue!") #DEBUG
                     msg_buffer = msg_buffer[msg_length + 1:]
                 else:
                     try:
                         msg_buffer += connection.recv(1024)
-                    except connection.timeout:
+                    except socket.timeout:
                         pass
             else:
                 try:
                     msg_buffer += connection.recv(1024)
-                except connection.timeout:
+                except socket.timeout:
                     pass
 
     def determine_length_of_json_msg(self, message_bytes):
@@ -311,7 +311,7 @@ class DebugMenu(cmd.Cmd):
 
     def do_pull_pubmsg(self, arg):
         """Pull a pubmsg off the stack."""
-        self.logic.get_pubmsg()
+        print(self.logic.get_pubmsg())
 
 class ConfigurationError(Exception):
     """Error raised when the client is configured improperly and it is not 
@@ -337,6 +337,27 @@ class InvalidLengthHeader(LengthHeaderError):
     """Error raised when a length header appears to be present but
     garbled."""
     pass
+
+class MessageDelimiterError(LengthHeaderError):
+    """Abstract message delimiter error class."""
+    pass
+
+class MissingMessageDelimiter(MessageDelimiterError):
+    """Error raised when a message delimiter appears to be missing."""
+    pass
+
+class InvalidMessageDelimiter(MessageDelimiterError):
+    """Error raised when a message delimiter appears to be present but
+    garbled."""
+    pass
+
+class JSONDecodeError(Exception):
+    """Error raised when a json encoded message fails to decode to a valid JSON
+    document."""
+    def __init__(self, invalid_json="JSON not given."):
+        self.invalid_json = invalid_json
+    def __str__(self):
+        return repr(self.invalid_json)
 
 debug = DebugMenu()
 debug.cmdloop()
