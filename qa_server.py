@@ -3,6 +3,7 @@ import threading
 import queue
 import json
 
+
 class PublishSubscribe():
     """Publish Subscribe mechanism for the QA system.
 
@@ -49,19 +50,22 @@ class PublishSubscribe():
         """
         while True:
             message_tuple = self.Messages.get()
+            print("Pubsub got a message!") #DEBUG
             message = message_tuple[0]
             connection = message_tuple[1]
             message["timestamp"] = None # Need to add later.
-            if not message["name"]: # Reject messages from clients which have not logged in
+            if not message["username"]: # Reject messages from clients which have not logged in
+                print("Not logged in.") #DEBUG
                 continue
             if "muted" in self.Subscriptions[connection]["user_info"]["privileges"]:
+                print("Muted.") #DEBUG
                 muted = self.Subscriptions[connection]["user_info"]["privileges"]["muted"]
                 if muted:
                         continue #TODO: Make this send a message back to the client that
                               # their message was not sent.
-                else:
-                    for subscriber in self.Subscriptions:
-                        subscriber.put_msg(message)
+            else:
+                for subscriber in self.Subscriptions:
+                    subscriber.put_msg(message)
         
 
 class QAServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
@@ -102,7 +106,7 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
         before cutting the cord.
         """
         send_queue = queue.Queue() # The message output queue
-        user_info = {"name":None, "privileges":None}
+        user_info = {"username":None, "privileges":dict()}
         server_info = {"protocol":None, "client":None}
 
         def handle(self):
@@ -144,8 +148,9 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
             msg_buffer = bytes() # The message input buffer
             while 1:
                 if not self.send_queue.empty():
-                    utf8_message = self.send_queue.get()
-                    self.send_msg(utf8_message)
+                    print("Queue message detected!") #DEBUG
+                    message = self.send_queue.get()
+                    self.send_msg(message)
                 elif msg_buffer:
                     msg_length = self.determine_length_of_json_msg(msg_buffer)
                     if len(msg_buffer) >= msg_length:
@@ -217,18 +222,21 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
         def put_msg(self, utf8_message):
             """Put a message into the connections send queue."""
             self.send_queue.put(utf8_message)
+            print("Message put in send queue!") #DEBUG
 
         def send_msg(self, message):
             """Send a message that the connection mainloop has in its send queue."""
+            print("Sending message!") #DEBUG
             message_tuple = [self._calculate_recursive_length(message), message]
             json_message = json.dumps(message_tuple)
             utf8_message = json_message.encode('utf-8')
             while utf8_message:
                 try:
                     sent = self.request.send(utf8_message)
-                except timeout:
+                except self.request.timeout:
                     self.handle_quit("Timeout occurred.")
                 utf8_message = utf8_message[sent:]
+            print("Message sent!") #DEBUG
             return True
 
         def select_and_handle_msg(self, message):
@@ -266,14 +274,16 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
             """
             self.user_info.update(message["user"])
             self.server_info.update(message["server"])
-            print("LOGON REACHED!")
+            print("LOGON REACHED!") #DEBUG
+            print(message) #DEBUG
+            print(self.user_info, self.server_info) #DEBUG
             PubSub.subscribe(self, {"user_info":self.user_info, 
                                     "server_info":self.server_info})
             return True
 
         def handle_pubmsg(self, message):
             """Handle a public message sent to the single QA room."""
-            message["name"] = self.user_info["name"]
+            message["username"] = self.user_info["username"]
             PubSub.send_pubmsg((message, self))
             return True
 
