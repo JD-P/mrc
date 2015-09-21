@@ -1,4 +1,5 @@
 import socketserver
+import socket
 import threading
 import queue
 import json
@@ -226,14 +227,14 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
 
         def send_msg(self, message):
             """Send a message that the connection mainloop has in its send queue."""
-            print("Sending message!") #DEBUG
+            print("Sending message!" + repr(message)) #DEBUG
             message_tuple = [self._calculate_recursive_length(message), message]
-            json_message = json.dumps(message_tuple)
+            json_message = json.dumps(message_tuple) + '\r\n\r\n'
             utf8_message = json_message.encode('utf-8')
             while utf8_message:
                 try:
                     sent = self.request.send(utf8_message)
-                except self.request.timeout:
+                except socket.timeout:
                     self.handle_quit("Timeout occurred.")
                 utf8_message = utf8_message[sent:]
             print("Message sent!") #DEBUG
