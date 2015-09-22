@@ -25,8 +25,8 @@ class QAClientLogic():
         if os.name == 'posix':
             self.confpath = os.path.join(os.path.expanduser("~"), ".mrc/qa_system/",
                                          "client/settings.conf")
-        elif platform.system == 'Windows':
-            self.confpath = os.path.join(os.environ['APPDATA'] + "mrc\\qa_system\\",
+        elif platform.system() == 'Windows':
+            self.confpath = os.path.join(os.environ['APPDATA'] + "\\mrc\\qa_system\\",
                                          "client\\settings.conf")
         self.registry = {}
         self.pubmsg_queue = queue.Queue()
@@ -135,7 +135,10 @@ class QAClientLogic():
             "user":{},
             "server":{}
             }
-        config_file = open(self.confpath)
+        try:
+            config_file = open(self.confpath)
+        except FileNotFoundError:
+            self._mkconfig(self.confpath)
         config = json.load(config_file)
         connect_msg["type"] = "logon"
         # Create user connect info
