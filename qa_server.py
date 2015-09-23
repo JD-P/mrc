@@ -1,5 +1,6 @@
 import socketserver
 import socket
+import select
 import threading
 import queue
 import json
@@ -159,9 +160,15 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
                         self.select_and_handle_msg(message)
                         msg_buffer = msg_buffer[msg_length + 1:]
                     else:
-                        msg_buffer += self.request.recv(1024)
+                        if select.select([self.request], [], [], 0.1)[0]:
+                            msg_buffer += self.request.recv(1024)
+                        else:
+                            continue
                 else:
-                    msg_buffer += self.request.recv(1024)
+                    if select.select([self.request], [], [], 0.1)[0]:
+                        msg_buffer += self.request.recv(1024)
+                    else:
+                        continue
                         
 
         def extract_msg(self, msg_buffer, length):
