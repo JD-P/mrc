@@ -298,11 +298,14 @@ class QAClientGUI(QtGui.QApplication):
 
 class DebugMenu(cmd.Cmd):
     def do_test_connection(self, hostname):
+        """Test the ability to connect to a running QA server."""
         logic = QAClientLogic()
         fail = logic.make_connection(hostname=hostname)
         print(fail)
 
     def do_connect(self, hostname):
+        """Connect to a running QA server. Must be given the hostname of the server
+        as an argument."""
         self.logic = QAClientLogic()
         fail = self.logic.make_connection(hostname=hostname)
         if fail is False:
@@ -311,9 +314,13 @@ class DebugMenu(cmd.Cmd):
             print("Connection Made")
 
     def do_logon(self, hostname):
+        """Once connected to a QA server, logs onto the server to subscribe to 
+        messages sent by other clients and allow the sending of messages from
+        this one."""
         self.logic.logon()
 
     def do_pubmsg(self, message_text):
+        """Send the server a public message intended for the entire room."""
         self.logic.pubmsg(message_text)
 
     def do_pull_pubmsg(self, arg):
