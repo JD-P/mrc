@@ -85,7 +85,11 @@ class QAClientLogic():
         Logon to the server.
         """
         logon_msg = self.build_initial_connect_msg()
-        self.registry["Sender"].put_msg(logon_msg)
+        try:
+            self.registry["Sender"].put_msg(logon_msg)
+        except KeyError:
+            raise ConnectionError("Sender was not initialized. This is probably"
+                                  " caused by a nonexistent connection.")
         return True
 
     def pubmsg(self, message_text):
@@ -327,6 +331,13 @@ class ConfigurationError(Exception):
 class StreamError(Exception):
     """Errors related to handling MRC streams."""
     pass
+
+class ConnectionError(StreamError):
+    """Error raised when a connection is broken or nonexistent."""
+    def __init__(self, error_message):
+        self.error_message = error_message
+    def __str__(self):
+        return repr(self.error_message)
 
 class LengthHeaderError(StreamError):
     """Abstract length header error class."""
