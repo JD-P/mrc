@@ -304,8 +304,10 @@ class DebugMenu(cmd.Cmd):
         print(fail)
 
     def do_connect(self, hostname):
-        """Connect to a running QA server. Must be given the hostname of the server
-        as an argument."""
+        """Connect to a running QA server. 
+
+        Must be given the hostname of the server as an argument.
+        """
         self.logic = QAClientLogic()
         fail = self.logic.make_connection(hostname=hostname)
         if fail is False:
@@ -314,9 +316,13 @@ class DebugMenu(cmd.Cmd):
             print("Connection Made")
 
     def do_logon(self, hostname):
-        """Once connected to a QA server, logs onto the server to subscribe to 
+        """
+        Log onto a QA server you are connected to.
+
+        Once connected to a QA server, logs onto the server to subscribe to 
         messages sent by other clients and allow the sending of messages from
-        this one."""
+        this one.
+        """
         self.logic.logon()
 
     def do_pubmsg(self, message_text):
