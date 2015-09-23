@@ -145,7 +145,7 @@ class QAClientLogic():
         connect_msg["user"]["username"] = "Guest" + str(random.randrange(10000))
         connect_msg["user"]["type"] = config["user"]["type"]
         if connect_msg["user"]["type"] not in ["user", "admin"]:
-            raise Exception("User access was not 'user' or 'admin'.")
+            raise ConfigurationError("User access was not 'user' or 'admin'.")
         # Create server connect info
         connect_msg["server"]["protocol"] = "QAServ1.0"
         connect_msg["server"]["client"] = "QA_QT1.0"
@@ -319,7 +319,10 @@ class DebugMenu(cmd.Cmd):
 class ConfigurationError(Exception):
     """Error raised when the client is configured improperly and it is not 
     recoverable."""
-    pass
+    def __init__(self, error_message="No error message given."):
+        self.error_message = error_message
+    def __str__(self):
+        return repr(self.error_message)
 
 class StreamError(Exception):
     """Errors related to handling MRC streams."""
