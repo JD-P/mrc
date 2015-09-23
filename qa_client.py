@@ -320,6 +320,10 @@ class DebugMenu(cmd.Cmd):
         """Pull a pubmsg off the stack."""
         print(self.logic.get_pubmsg())
 
+    def do_quit(self, arg):
+        """Exit the debug menu."""
+        return True
+
 class ConfigurationError(Exception):
     """Error raised when the client is configured improperly and it is not 
     recoverable."""
