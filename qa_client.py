@@ -5,6 +5,7 @@ import queue
 import socket
 import random
 import json
+import base64
 # import pyscreenshot
 import cmd
 from PySide import QtCore
@@ -81,9 +82,7 @@ class QAClientLogic():
         return True
 
     def logon(self):
-        """
-        Logon to the server.
-        """
+        """Logon to the server."""
         logon_msg = self.build_initial_connect_msg()
         try:
             self.registry["Sender"].put_msg(logon_msg)
@@ -100,6 +99,24 @@ class QAClientLogic():
         message = [self._calculate_recursive_length(json_dict), json_dict]
         self.registry["Sender"].put_msg(message)
         return True
+
+    def screenshot(self, screenshot_bytes):
+        """Send a screenshot to the server given as the parameter 
+        <screenshot_bytes>."""
+        json_dict = {"type":"screenshot", 
+                     "screenshot":base64.b64encode(screenshot_bytes)}
+        message = [self._calculate_recursive_length(json_dict), json_dict]
+        self.registry["Sender"].put_msg(message)
+        return True
+        
+
+    def quit(self):
+        """Send a quit message to the server and close the connection."""
+        pass #TODO: Make this work by fixing the race condition caused by closing
+             # the connection
+        #self.registry["Sender"].put_msg({"type":"quit"})
+        #self.connection.close()
+        #return True
 
     def get_pubmsg(self):
         """Get and return a pubmsg from the logic instances pubmsg queue."""
@@ -329,12 +346,23 @@ class DebugMenu(cmd.Cmd):
         """Send the server a public message intended for the entire room."""
         self.logic.pubmsg(message_text)
 
+    def do_screenshot(self, filepath):
+        """Send a screenshot taken from the file given by <filepath> to a QA server."""
+        try:
+            screenshot_file = open(filepath, 'br')
+        except IOError:
+            print("File not found.")
+        screenshot = screenshot_file.open()
+        self.logic.screenshot(screenshot)
+
+
     def do_pull_pubmsg(self, arg):
         """Pull a pubmsg off the stack."""
         print(self.logic.get_pubmsg())
 
     def do_quit(self, arg):
         """Exit the debug menu."""
+        self.logic.quit()
         return True
 
 class ConfigurationError(Exception):
