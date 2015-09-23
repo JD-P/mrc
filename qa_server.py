@@ -22,6 +22,7 @@ class PublishSubscribe():
         PubSub = self
         self.Subscriptions = {}
         self.Messages = queue.Queue()
+        self.swear_words_list = None #TODO: Make this point to a real file in the config.
         self.pub_sub_loop()
 
     def subscribe(self, connection, logon_info):
@@ -30,8 +31,8 @@ class PublishSubscribe():
         self.Subscriptions[connection] = logon_info
         return True
 
-    def send_pubmsg(self, message):
-        """Put a <message> into the publish queue."""
+    def put_msg_into_publish_queue(self, message):
+        """Put a <message> into this objects publish queue."""
         self.Messages.put(message)
         return True
 
@@ -40,16 +41,25 @@ class PublishSubscribe():
         Main Publish Subscribe loop for MRC.
 
         This loop runs in a seperate thread of execution. It takes items from a
-        push queue which is filled through a method of this object send_pubmsg().
+        push queue which is filled through a method of this object put_msg_into_publish_queue().
         
         Messages are sent with their associated connection in a tuple of the form
         (message, connection). This connection has its privileges checked before 
         publish time. If the connection has a privilege setting effecting its 
         ability to publish such as being muted that is handled here.
 
+        How it is handled is that a function corresponding to the type of message
+        is grabbed as an attribute from PublishSubscribe. Passed to this function
+        is all the information necessary to determine whether or not it should be
+        sent and if so to whom. A seperate communication channel is opened in the
+        returned values for error messages such as those informing a user they are
+        muted to be sent to the client.
+
         The message is grabbed, then the privilege checks are applied, finally
         if applicable the message is sent to the entire subscriber list.
         """
+        # TODO: Write a system that lets you have functions to generate lists of
+        # subscribers to send a message to based on its type and contents.
         while True:
             message_tuple = self.Messages.get()
             print("Pubsub got a message!") #DEBUG
@@ -59,16 +69,40 @@ class PublishSubscribe():
             if not message["username"]: # Reject messages from clients which have not logged in
                 print("Not logged in.") #DEBUG
                 continue
-            if "muted" in self.Subscriptions[connection]["user_info"]["privileges"]:
-                print("Muted.") #DEBUG
-                muted = self.Subscriptions[connection]["user_info"]["privileges"]["muted"]
-                if muted:
-                        continue #TODO: Make this send a message back to the client that
-                              # their message was not sent.
-            else:
-                for subscriber in self.Subscriptions:
-                    subscriber.put_msg(message)
+            msg_type = message["type"]
+            msg_filter = getattr(self, "filter_" + msg_type)
+            filtered = msg_filter(self.Subscriptions, connection, message)
+            filtered_recipients = filtered[0]
+            error_notifications = filtered[1]
+            message = filtered[2]
+            for recipient in filtered_recipients:
+                recipient.put_msg(message)
+            for error in error_notifications:
+                self.put_msg_into_publish_queue(error)
+
+    def filter_pubmsg(self, subscriptions, connection, pubmsg):
+        """Filter a public message sent to the entire room.
+
+        Public messages are filtered on swear words and privileges such as whether
+        a given user is currently muted.
+        """
+        if "muted" in subscriptions[connection]["user_info"]["privileges"]:
+            print("Muted.") #DEBUG
+            muted = subscriptions[connection]["user_info"]["privileges"]["muted"]
+            if muted:
+                return (list(), list(), None) 
+                #TODO: Make this send a message back to the client that
+                # their message was not sent.
+        # pubmsg["msg"] = censor_swear_words(pubmsg["msg"]) TODO: Implement this.
+        else:
+            return (subscriptions, list(), pubmsg)
+
+    def filter_screenshot(self, subscriptions, connection, screenshot):
+        pass
         
+
+    def censor_swear_words(self, message_text):
+        """Replace swear words in the text of a message with astericks."""
 
 class QAServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     """Questions and answer server for demonstrations in a computer lab.
@@ -292,8 +326,12 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
         def handle_pubmsg(self, message):
             """Handle a public message sent to the single QA room."""
             message["username"] = self.user_info["username"]
-            PubSub.send_pubmsg((message, self))
+            PubSub.put_msg_into_publish_queue((message, self))
             return True
+
+        def handle_screenshot(self, screenshot):
+            """Handle a screenshot sent to the administrators of the QA room."""
+            screenshot
 
         def handle_quit(self, timout_msg):
             """Handle a connection quitting or timing out."""
