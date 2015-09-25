@@ -104,7 +104,7 @@ class QAClientLogic():
         """Send a screenshot to the server given as the parameter 
         <screenshot_bytes>."""
         json_dict = {"type":"screenshot", 
-                     "screenshot":base64.b64encode(screenshot_bytes)}
+                     "screenshot":str(base64.b64encode(screenshot_bytes))}
         message = [self._calculate_recursive_length(json_dict), json_dict]
         self.registry["Sender"].put_msg(message)
         return True
@@ -164,8 +164,9 @@ class QAClientLogic():
         connect_msg["type"] = "logon"
         # Create user connect info
         connect_msg["user"]["username"] = "Guest" + str(random.randrange(10000))
-        connect_msg["user"]["type"] = config["user"]["type"]
-        if connect_msg["user"]["type"] not in ["user", "admin"]:
+        connect_msg["user"]["privileges"] = dict()
+        connect_msg["user"]["privileges"]["type"] = config["user"]["type"]
+        if connect_msg["user"]["privileges"]["type"] not in ["user", "admin"]:
             raise ConfigurationError("User access was not 'user' or 'admin'.")
         # Create server connect info
         connect_msg["server"]["protocol"] = "QAServ1.0"
@@ -352,7 +353,7 @@ class DebugMenu(cmd.Cmd):
             screenshot_file = open(filepath, 'br')
         except IOError:
             print("File not found.")
-        screenshot = screenshot_file.open()
+        screenshot = screenshot_file.read()
         self.logic.screenshot(screenshot)
 
 
