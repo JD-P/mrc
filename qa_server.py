@@ -98,11 +98,16 @@ class PublishSubscribe():
             return (subscriptions, list(), pubmsg)
 
     def filter_screenshot(self, subscriptions, connection, screenshot):
-        pass
+        recipients = []
+        for subscriber in subscriptions:
+            if subscriptions[subscriber]["user_info"]["privileges"]["type"] == "admin":
+                recipients.append(subscriber)
+        return (recipients, list(), screenshot)
         
 
     def censor_swear_words(self, message_text):
         """Replace swear words in the text of a message with astericks."""
+        pass
 
 class QAServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     """Questions and answer server for demonstrations in a computer lab.
@@ -331,7 +336,9 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
 
         def handle_screenshot(self, screenshot):
             """Handle a screenshot sent to the administrators of the QA room."""
-            screenshot
+            screenshot["username"] = self.user_info["username"]
+            PubSub.put_msg_into_publish_queue((screenshot, self))
+            return True
 
         def handle_quit(self, timout_msg):
             """Handle a connection quitting or timing out."""
