@@ -422,5 +422,6 @@ class JSONDecodeError(Exception):
     def __str__(self):
         return repr(self.invalid_json)
 
-debug = DebugMenu()
-debug.cmdloop()
+if __name__ == "__main__":
+    debug = DebugMenu()
+    debug.cmdloop()
