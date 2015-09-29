@@ -75,6 +75,7 @@ class PublishSubscribe():
             filtered_recipients = filtered[0]
             error_notifications = filtered[1]
             message = filtered[2]
+            print(filtered_recipients, error_notifications, message) #DEBUG
             for recipient in filtered_recipients:
                 recipient.put_msg(message)
             for error in error_notifications:
@@ -146,9 +147,6 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
         should be handled by waiting several minutes for the client to recover
         before cutting the cord.
         """
-        send_queue = queue.Queue() # The message output queue
-        user_info = {"username":None, "privileges":dict()}
-        server_info = {"protocol":None, "client":None}
 
         def handle(self):
             """Handle a QA connection.
@@ -186,6 +184,9 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
             so he can see the state without having to get up and look. Images
             are encoded as base64 so that they can be sent as JSON documents.
             """
+            self.send_queue = queue.Queue() # The message output queue
+            self.user_info = {"username":None, "privileges":dict()}
+            self.server_info = {"protocol":None, "client":None}
             msg_buffer = bytes() # The message input buffer
             while 1:
                 if not self.send_queue.empty():
