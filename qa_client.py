@@ -160,6 +160,7 @@ class QAClientLogic():
             config_file = open(self.confpath)
         except FileNotFoundError:
             self._mkconfig(self.confpath)
+            config_file = open(self.confpath)
         config = json.load(config_file)
         connect_msg["type"] = "logon"
         # Create user connect info
