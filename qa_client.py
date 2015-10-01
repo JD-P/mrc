@@ -120,7 +120,7 @@ class QAClientLogic():
 
     def get_pubmsg(self):
         """Get and return a pubmsg from the logic instances pubmsg queue."""
-        return self.pubmsg_queue.get()
+        return self.pubmsg_queue.get(timeout=0.05)
 
     def put_pubmsg(self, message):
         """Put a pubmsg from a ReceieveLoop into the logic instances pubmsg queue.
