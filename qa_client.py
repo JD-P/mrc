@@ -32,7 +32,7 @@ class QAClientLogic():
         self.registry = {}
         self.pubmsg_queue = queue.Queue()
 
-    def make_connection(self, hostname=None, port=9665):
+    def connect(self, hostname=None, port=9665):
         """Make a connection to a given host. If host not given make a connection
         to the address specified in the config file."""
         # Try connecting to given host
@@ -319,7 +319,7 @@ class DebugMenu(cmd.Cmd):
     def do_test_connection(self, hostname):
         """Test the ability to connect to a running QA server."""
         logic = QAClientLogic()
-        fail = logic.make_connection(hostname=hostname)
+        fail = logic.connect(hostname=hostname)
         print(fail)
 
     def do_connect(self, hostname):
@@ -328,7 +328,7 @@ class DebugMenu(cmd.Cmd):
         Must be given the hostname of the server as an argument.
         """
         self.logic = QAClientLogic()
-        fail = self.logic.make_connection(hostname=hostname)
+        fail = self.logic.connect(hostname=hostname)
         if fail is False:
             print(fail)
         else:
