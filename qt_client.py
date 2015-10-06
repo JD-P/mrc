@@ -61,21 +61,24 @@ class QuestionAnswerSystemClient(QWidget):
         sender and the time the message was sent.
         """
         try:
-            pubmsg = self.logic.get_pubmsg()
+            raw_pubmsg = self.logic.get_pubmsg()
         except queue.Empty:
             return False
+        pubmsg_wrapped = json.loads(raw_pubmsg)
+        pubmsg = pubmsg_wrapped[1]
         pubmsg_text = (str(pubmsg["timestamp"]) + 
                        " <" + str(pubmsg["username"]) + "> " 
                        + str(pubmsg["msg"]))
-        self.append_text(pubmsg_text, self.discussion_view)
+        self.append_text(pubmsg_text, self.discussion_view_text)
 
-    def append_text(text, text_document):
+    def append_text(self, text, text_document):
         """Append a piece of text to the end of a QTextDocument as a new block."""
         appender = QTextCursor(text_document)
         appender.movePosition(QTextCursor.End)
         appender.insertBlock()
         text_insert = QTextDocumentFragment.fromPlainText(text)
         appender.insertFragment(text_insert)
+        print("Text appended!")
         return True
                 
     def read_config(self, confpath):
