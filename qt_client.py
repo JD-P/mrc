@@ -21,6 +21,7 @@ class QuestionAnswerSystemClient(QWidget):
         self.chat_core = QHBoxLayout()
         self.control_panel = QHBoxLayout()
         self.chat_bar = QLineEdit(self)
+        self.chat_bar.returnPressed.connect(self.send_msg_to_room)
         # Create the room info widgets
         self.discussion_topic = QLabel("Placeholder", self)
         self.room_address = QLabel(self.config["client"]["default_host"], self)
@@ -53,7 +54,7 @@ class QuestionAnswerSystemClient(QWidget):
         self.top_layout.addWidget(self.chat_bar)
         # Connect signals and slots for events
         self.pacemaker = QTimer(self)
-        self.connect(self.pacemaker, SIGNAL("timeout()"), self.circulate)
+        self.pacemaker.timeout.connect(self.circulate)
         self.pacemaker.start(50)
 
     def circulate(self):
@@ -74,6 +75,14 @@ class QuestionAnswerSystemClient(QWidget):
                        " <" + str(pubmsg["username"]) + "> " 
                        + str(pubmsg["msg"]))
         self.append_text(pubmsg_text, self.discussion_view_cursor)
+        return True
+
+    @Slot(str, result=bool) 
+    def send_msg_to_room(self):
+        """Send a pubmsg to the room which the client is logged into."""
+        line = self.chat_bar.text()
+        self.chat_bar.clear()
+        self.logic.pubmsg(line)
         return True
 
     def append_text(self, text, appender_cursor):
