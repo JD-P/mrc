@@ -16,7 +16,7 @@ class QuestionAnswerSystemClient(QWidget):
         self.setWindowTitle("Makerspace QA System")
         self.setMinimumWidth(600)
         # Create the top level layouts and widgets of the program
-        self.layout = QVBoxLayout()
+        self.top_layout = QVBoxLayout()
         self.room_info = QHBoxLayout()
         self.chat_core = QHBoxLayout()
         self.control_panel = QHBoxLayout()
@@ -28,15 +28,17 @@ class QuestionAnswerSystemClient(QWidget):
         self.room_info.addWidget(self.room_address)
         # Create the chat core widgets
         self.discussion_view = QTextEdit(self)
-        self.discussion_view_text = QTextDocument(self)
+        self.discussion_view_text = QTextDocument(self.discussion_view)
+        self.discussion_view_cursor = QTextCursor(self.discussion_view_text)
         self.discussion_view.setReadOnly(True)
         self.discussion_view.setDocument(self.discussion_view_text)
-        self.user_list = QTextEdit(self)
-        self.user_list_text = QTextDocument(self)
-        self.user_list.setReadOnly(True)
-        self.user_list.setDocument(self.user_list_text)
+        self.discussion_view.setTextCursor(self.discussion_view_cursor)
+        #self.user_list = QTextEdit(self)
+        #self.user_list_text = QTextDocument(self)
+        #self.user_list.setReadOnly(True)
+        #self.user_list.setDocument(self.user_list_text)
         self.chat_core.addWidget(self.discussion_view)
-        self.chat_core.addWidget(self.user_list)
+        #self.chat_core.addWidget(self.user_list)
         # Create the control panel widgets
         if os.name == 'posix':
             iconpath = "icons/"
@@ -46,7 +48,9 @@ class QuestionAnswerSystemClient(QWidget):
         self.screenshot_button = QToolButton
         self.mute_indicator_icon = QIcon(iconpath + "comment.png")
         # Add layouts to top level layout and run program
-        self.layout.addLayout(self.chat_core)
+        self.setLayout(self.top_layout)
+        self.top_layout.addLayout(self.chat_core)
+        self.top_layout.addWidget(self.chat_bar)
         # Connect signals and slots for events
         self.pacemaker = QTimer(self)
         self.connect(self.pacemaker, SIGNAL("timeout()"), self.circulate)
@@ -69,16 +73,16 @@ class QuestionAnswerSystemClient(QWidget):
         pubmsg_text = (str(pubmsg["timestamp"]) + 
                        " <" + str(pubmsg["username"]) + "> " 
                        + str(pubmsg["msg"]))
-        self.append_text(pubmsg_text, self.discussion_view_text)
+        self.append_text(pubmsg_text, self.discussion_view_cursor)
+        return True
 
-    def append_text(self, text, text_document):
+    def append_text(self, text, appender_cursor):
         """Append a piece of text to the end of a QTextDocument as a new block."""
-        appender = QTextCursor(text_document)
-        appender.movePosition(QTextCursor.End)
-        appender.insertBlock()
+        appender_cursor.movePosition(QTextCursor.End)
+        appender_cursor.insertBlock()
         text_insert = QTextDocumentFragment.fromPlainText(text)
-        appender.insertFragment(text_insert)
-        print("Text appended!")
+        appender_cursor.insertFragment(text_insert)
+        print("Text appended!") #DEBUG
         return True
                 
     def read_config(self, confpath):
