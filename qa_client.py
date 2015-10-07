@@ -308,12 +308,7 @@ class ReceiveLoop():
             raise InvalidMessageDelimiter(message)
         else:
             raise MissingMessageDelimiter(message)
-    
 
-class QAClientGUI(QtGui.QApplication):
-    """Graphical interface code for the Questions Answers client."""
-    def on_click(self):
-        self.beep()
 
 class DebugMenu(cmd.Cmd):
     def do_test_connection(self, hostname):
