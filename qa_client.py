@@ -65,10 +65,12 @@ class QAClientLogic():
         """
         self.Sender_reg = threading.Event()
         send_loop = threading.Thread(target=SendLoop, args=(self, connection))
+        send_loop.daemon = True
         send_loop.start()
         self.Sender_reg.wait()
         self.Receiver_reg = threading.Event()
         receive_loop = threading.Thread(target=ReceiveLoop, args=(self, connection))
+        receive_loop.daemon = True
         receive_loop.start()
         self.Receiver_reg.wait()
         return True
