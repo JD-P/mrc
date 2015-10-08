@@ -8,8 +8,6 @@ import json
 import base64
 # import pyscreenshot
 import cmd
-from PySide import QtCore
-from PySide import QtGui
 
 class QAClientLogic():
     """Question Answer client that provides both administrator and user interfaces.
@@ -59,7 +57,6 @@ class QAClientLogic():
         # If connection succeeds, create input and output threads
         self.instantiate_components(self.connection)
         return True
-
 
     def make_connection(self, hostname=None, port=9665):
         """Create and return a connection to <hostname> on <port>, return false 
