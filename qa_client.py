@@ -36,9 +36,10 @@ class QAClientLogic():
         """Make a connection to a given host. If host not given make a connection
         to the address specified in the config file."""
         # Try connecting to given host
-        try:
-            self.connection = socket.create_connection((hostname, port))
-        except socket.error:
+        self.connection = self.make_connection(hostname, port)
+        if self.connection:
+            self.host = hostname
+        else:
             # If failure, open config file and get host from there
             try:
                 config_file = open(self.confpath)
@@ -48,15 +49,27 @@ class QAClientLogic():
                 config_file = open(self.confpath)
             config = json.load(config_file)
             # Try connecting with new host
-            try:
-                self.connection = socket.create_connection(
-                    (config["client"]["default_host"], port))
-            except socket.error:
+            self.connection = self.make_connection(
+                config["client"]["default_host"], port)
+            if self.connection:
+                self.host = config["client"]["default_host"]
+            else:
                 # If failure, unrecoverable error and return to parent
                 return False
         # If connection succeeds, create input and output threads
         self.instantiate_components(self.connection)
         return True
+
+
+    def make_connection(self, hostname=None, port=9665):
+        """Create and return a connection to <hostname> on <port>, return false 
+        otherwise."""
+        try:
+            connection = socket.create_connection((hostname, port))
+        except socket.error:
+            return False
+        return connection
+
 
     def instantiate_components(self, connection):
         """
