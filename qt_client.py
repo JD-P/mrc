@@ -23,8 +23,8 @@ class QuestionAnswerSystemClient(QWidget):
         self.chat_bar = QLineEdit(self)
         self.chat_bar.returnPressed.connect(self.send_msg_to_room)
         # Create the room info widgets
-        self.discussion_topic = QLabel("Placeholder", self)
-        self.room_address = QLabel(self.config["client"]["default_host"], self)
+        self.discussion_topic = QLabel("Placeholder Topic", self)
+        self.room_address = QLabel(self.logic.host, self)
         self.room_info.addWidget(self.discussion_topic)
         self.room_info.addWidget(self.room_address)
         # Create the chat core widgets
@@ -34,12 +34,12 @@ class QuestionAnswerSystemClient(QWidget):
         self.discussion_view.setReadOnly(True)
         self.discussion_view.setDocument(self.discussion_view_text)
         self.discussion_view.setTextCursor(self.discussion_view_cursor)
-        #self.user_list = QTextEdit(self)
-        #self.user_list_text = QTextDocument(self)
-        #self.user_list.setReadOnly(True)
-        #self.user_list.setDocument(self.user_list_text)
+        self.user_list = QTextEdit(self)
+        self.user_list_text = QTextDocument(self.user_list)
+        self.user_list.setReadOnly(True)
+        self.user_list.setDocument(self.user_list_text)
         self.chat_core.addWidget(self.discussion_view)
-        #self.chat_core.addWidget(self.user_list)
+        self.chat_core.addWidget(self.user_list)
         # Create the control panel widgets
         if os.name == 'posix':
             iconpath = "icons/"
@@ -50,6 +50,7 @@ class QuestionAnswerSystemClient(QWidget):
         self.mute_indicator_icon = QIcon(iconpath + "comment.png")
         # Add layouts to top level layout and run program
         self.setLayout(self.top_layout)
+        self.top_layout.addLayout(self.room_info)
         self.top_layout.addLayout(self.chat_core)
         self.top_layout.addWidget(self.chat_bar)
         # Connect signals and slots for events
