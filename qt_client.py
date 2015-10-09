@@ -76,6 +76,8 @@ class QuestionAnswerSystemClient(QWidget):
                        " <" + str(pubmsg["username"]) + "> " 
                        + str(pubmsg["msg"]))
         self.append_text(pubmsg_text, self.discussion_view_cursor)
+        scroll = self.discussion_view.verticalScrollBar()
+        scroll.triggerAction(scroll.SliderToMaximum)
         return True
 
     @Slot(str, result=bool) 
@@ -92,7 +94,7 @@ class QuestionAnswerSystemClient(QWidget):
         appender_cursor.insertBlock()
         text_insert = QTextDocumentFragment.fromPlainText(text)
         appender_cursor.insertFragment(text_insert)
-        print("Text appended!") #DEBUG
+        appender_cursor.movePosition(QTextCursor.End)
         return True
                 
     def read_config(self, confpath):
