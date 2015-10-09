@@ -24,7 +24,9 @@ class QuestionAnswerSystemClient(QWidget):
         self.chat_bar.returnPressed.connect(self.send_msg_to_room)
         # Create the room info widgets
         self.discussion_topic = QLabel("Placeholder Topic", self)
-        self.room_address = QLabel(self.logic.host, self)
+        self.discussion_topic.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
+        self.room_address = QLabel("Host: " + self.logic.host, self)
+        self.room_address.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
         self.room_info.addWidget(self.discussion_topic)
         self.room_info.addWidget(self.room_address)
         # Create the chat core widgets
