@@ -4,7 +4,7 @@ import select
 import threading
 import queue
 import json
-
+import argparse
 
 class PublishSubscribe():
     """Publish Subscribe mechanism for the QA system.
@@ -390,11 +390,24 @@ class JSONDecodeError(Exception):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--host", default="localhost", 
+                        help="The hostname to serve on.")
+    parser.add_argument("-p", "--port", default=9665, type=int, 
+                        help="The port number on which to allow access.")
+    #TODO: Add 'debug' argument that profiles code and let's you know which 
+    # portions were called during a program run.
+    # One way to do this as a general process might be to find a way to do it and
+    # then find a way to do that thing from python. Eg if you can use the python
+    # debugger to get a stack trace, then using the python debugger from within
+    # python should let you get a stack trace.
+    arguments = parser.parse_args()
+
     PubSubThread = threading.Thread(target=PublishSubscribe)
 
     PubSubThread.start()
 
-    HOST, PORT = "localhost", 9665
+    HOST, PORT = arguments.host, arguments.port
     
     server = QAServer((HOST, PORT), MRCStreamHandler)
 
