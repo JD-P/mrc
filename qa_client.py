@@ -265,7 +265,10 @@ class ReceiveLoop():
         msg_buffer = bytes() # The message input buffer
         while 1:
             if msg_buffer:
-                msg_length = self.determine_length_of_json_msg(msg_buffer)
+                try:
+                    msg_length = self.determine_length_of_json_msg(msg_buffer)
+                except InvalidLengthHeader:
+                    msg_length = float("inf")
                 if len(msg_buffer) >= msg_length:
                     message = self.extract_msg(msg_buffer, msg_length)
                     logic_instance.put_pubmsg(message)
@@ -291,6 +294,8 @@ class ReceiveLoop():
         # All messages must be written in utf-8
         message = message_bytes.decode('utf-8')
         # Check that the message we have been given looks like a valid length header
+        if "," not in message:
+            raise InvalidLengthHeader(message)
         length_portion = message.split(",")[0]
         left_bracket = length_portion[0] == "["
         number_before_comma = length_portion[-1] in "1234567890"
