@@ -69,10 +69,10 @@ class QuestionAnswerSystemClient(QWidget):
         sender and the time the message was sent.
         """
         try:
-            raw_pubmsg = self.logic.get_pubmsg()
+            raw_msg = self.logic.get_msg()
         except queue.Empty:
             return False
-        pubmsg_wrapped = json.loads(raw_pubmsg)
+        pubmsg_wrapped = json.loads(raw_msg)
         pubmsg = pubmsg_wrapped[1]
         pubmsg_text = (str(pubmsg["timestamp"]) + 
                        " <" + str(pubmsg["username"]) + "> " 
