@@ -135,7 +135,7 @@ class QAServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     server what sort of message can be expected within the rest of the JSON
     document.
     """
-    pass
+    daemon_threads = True
     
 
 class MRCStreamHandler(socketserver.BaseRequestHandler):
@@ -194,6 +194,7 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
                     message = self.send_queue.get()
                     self.send_msg(message)
                 elif msg_buffer:
+                    print("Message buffer has " + str(len(msg_buffer)) + " of content!") #DEBUG
                     try:
                         msg_length = self.determine_length_of_json_msg(msg_buffer)
                     except InvalidLengthHeader:
@@ -201,7 +202,7 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
                     if len(msg_buffer) >= msg_length:
                         message = self.extract_msg(msg_buffer, msg_length)
                         self.select_and_handle_msg(message)
-                        msg_buffer = msg_buffer[msg_length + 1:]
+                        msg_buffer = msg_buffer[msg_length:]
                     else:
                         if select.select([self.request], [], [], 0.1)[0]:
                             msg_buffer += self.request.recv(1024)
@@ -250,9 +251,9 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
                         length_start = character[0]
                         return int(length_portion[length_start:])
             elif left_bracket:
-                raise InvalidLengthHeader(length_portion)
+                raise InvalidLengthHeader((length_portion, message))
             else:
-                raise MissingLengthHeader(length_portion)
+                raise MissingLengthHeader((length_portion, message))
             return False
 
         def _calculate_recursive_length(self, json_dict):
@@ -409,11 +410,16 @@ if __name__ == '__main__':
     arguments = parser.parse_args()
 
     PubSubThread = threading.Thread(target=PublishSubscribe)
-
+    PubSubThread.daemon = True
     PubSubThread.start()
 
     HOST, PORT = arguments.host, arguments.port
     
     server = QAServer((HOST, PORT), MRCStreamHandler)
-
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("Keyboard interrupt detected!") #DEBUG
+        server.shutdown()
+        server.server_close()
+        quit()
