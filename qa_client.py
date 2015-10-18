@@ -130,11 +130,11 @@ class QAClientLogic():
         #self.connection.close()
         #return True
 
-    def get_pubmsg(self):
+    def get_msg(self):
         """Get and return a pubmsg from the logic instances pubmsg queue."""
         return self.pubmsg_queue.get(block=False)
 
-    def put_pubmsg(self, message):
+    def queue_msg(self, message):
         """Put a pubmsg from a ReceieveLoop into the logic instances pubmsg queue.
         
         Pubmsg's are pulled from their underlying logic instance by the client 
@@ -239,6 +239,7 @@ class SendLoop():
     def send_msg(self, connection, utf8_message):
         """Send a message that the connection mainloop has in its send queue."""
         while utf8_message:
+            print(utf8_message) #DEBUG
             try:
                 sent = connection.send(utf8_message)
             except socket.timeout:
@@ -271,9 +272,11 @@ class ReceiveLoop():
                     msg_length = float("inf")
                 if len(msg_buffer) >= msg_length:
                     message = self.extract_msg(msg_buffer, msg_length)
-                    logic_instance.put_pubmsg(message)
-                    print("Message put into queue!") #DEBUG
-                    msg_buffer = msg_buffer[msg_length + 1:]
+                    logic_instance.queue_msg(message)
+                    print("Message put into queue!",
+                          str(len(message)) + " bytes long!",
+                          repr(message)) #DEBUG
+                    msg_buffer = msg_buffer[msg_length:]
                 else:
                     try:
                         msg_buffer += connection.recv(1024)
@@ -370,9 +373,9 @@ class DebugMenu(cmd.Cmd):
         self.logic.screenshot(screenshot)
 
 
-    def do_pull_pubmsg(self, arg):
+    def do_pull_msg(self, arg):
         """Pull a pubmsg off the stack."""
-        print(self.logic.get_pubmsg())
+        print(self.logic.get_msg())
 
     def do_quit(self, arg):
         """Exit the debug menu."""
