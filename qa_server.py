@@ -71,7 +71,7 @@ class PublishSubscribe():
                 continue
             msg_type = message["type"]
             msg_filter = getattr(self, "filter_" + msg_type)
-            filtered = msg_filter(self.Subscriptions, connection, message)
+            filtered = msg_filter(self.Subscriptions.copy(), connection, message)
             filtered_recipients = filtered[0]
             error_notifications = filtered[1]
             message = filtered[2]
@@ -194,7 +194,10 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
                     message = self.send_queue.get()
                     self.send_msg(message)
                 elif msg_buffer:
-                    msg_length = self.determine_length_of_json_msg(msg_buffer)
+                    try:
+                        msg_length = self.determine_length_of_json_msg(msg_buffer)
+                    except InvalidLengthHeader:
+                        msg_length = float("inf")
                     if len(msg_buffer) >= msg_length:
                         message = self.extract_msg(msg_buffer, msg_length)
                         self.select_and_handle_msg(message)
@@ -234,6 +237,8 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
             # All messages must be written in utf-8
             message = message_bytes.decode('utf-8')
             # Check that the message we have been given looks like a valid length header
+            if "," not in message:
+                raise InvalidLengthHeader(message)
             length_portion = message.split(",")[0]
             left_bracket = length_portion[0] == "["
             number_before_comma = length_portion[-1] in "1234567890"
@@ -274,9 +279,9 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
 
         def send_msg(self, message):
             """Send a message that the connection mainloop has in its send queue."""
-            print("Sending message!" + repr(message)) #DEBUG
             message_tuple = [self._calculate_recursive_length(message), message]
             json_message = json.dumps(message_tuple) + '\r\n\r\n'
+            print("Sending message!" + repr(json_message), len(json_message.encode('utf-8'))) #DEBUG
             utf8_message = json_message.encode('utf-8')
             while utf8_message:
                 try:
