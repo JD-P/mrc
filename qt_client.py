@@ -36,12 +36,12 @@ class QuestionAnswerSystemClient(QWidget):
         self.discussion_view.setReadOnly(True)
         self.discussion_view.setDocument(self.discussion_view_text)
         self.discussion_view.setTextCursor(self.discussion_view_cursor)
-        self.user_list = QTextEdit(self)
-        self.user_list_text = QTextDocument(self.user_list)
-        self.user_list.setReadOnly(True)
-        self.user_list.setDocument(self.user_list_text)
+        self.user_list = QVBoxLayout()
+        self.user_list_label = QLabel("Users", self)
+        self.user_list_label.setFrameStyle(QFrame.Box | QFrame.Plain)
+        self.user_list.addWidget(self.user_list_label, alignment=Qt.AlignTop)
         self.chat_core.addWidget(self.discussion_view)
-        self.chat_core.addWidget(self.user_list)
+        self.chat_core.addLayout(self.user_list)
         # Create the control panel widgets
         if os.name == 'posix':
             iconpath = "icons/"
@@ -72,8 +72,14 @@ class QuestionAnswerSystemClient(QWidget):
             raw_msg = self.logic.get_msg()
         except queue.Empty:
             return False
-        pubmsg_wrapped = json.loads(raw_msg)
-        pubmsg = pubmsg_wrapped[1]
+        wrapped_msg = json.loads(raw_msg)
+        update = wrapped_msg[1]["type"]
+        update_method = getattr(self, "update_on_" + update)
+        update_method(wrapped_msg)
+        return True
+
+    def update_on_pubmsg(self, wrapped_msg):
+        pubmsg = wrapped_msg[1]
         pubmsg_text = (str(pubmsg["timestamp"]) + 
                        " <" + str(pubmsg["username"]) + "> " 
                        + str(pubmsg["msg"]))
