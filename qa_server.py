@@ -66,9 +66,14 @@ class PublishSubscribe():
             message = message_tuple[0]
             connection = message_tuple[1]
             message["timestamp"] = None # Need to add later.
-            if not message["username"]: # Reject messages from clients which have not logged in
-                print("Not logged in.") #DEBUG
-                continue
+            try:
+                if not message["username"]: # Reject messages from clients which have not logged in
+                    print("Not logged in.") #DEBUG
+                    continue
+            except KeyError:
+                raise ImproperHandlingError(
+                    message, 
+                    "No 'username' key was added by handler.")
             msg_type = message["type"]
             msg_filter = getattr(self, "filter_" + msg_type)
             filtered = msg_filter(self.Subscriptions.copy(), connection, message)
@@ -104,6 +109,21 @@ class PublishSubscribe():
             if subscriptions[subscriber]["user_info"]["privileges"]["type"] == "admin":
                 recipients.append(subscriber)
         return (recipients, list(), screenshot)
+
+    def filter_room(self, subscriptions, connection, room):
+        return ([connection], list(), room)
+
+    def filter_entrance(self, subscriptions, connection, entrance):
+        #TODO: Add a timestamp to the message
+        outmsg = {"type":"entrance",
+                  "username":subscriptions[connection]["user_info"]["username"]}
+        return (subscriptions, list(), outmsg)
+
+    def filter_exit(self, subscriptions, connection, _exit):
+        #TODO: YOU MUST VALIDATE THIS SO IT CAN'T BE SPOOFED
+        outmsg = {"type":"exit",
+                  "username":subscriptions[connection]["user_info"]["username"]}
+        return (subscriptions, list(), outmsg)
         
 
     def censor_swear_words(self, message_text):
@@ -333,6 +353,9 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
             print(self.user_info, self.server_info) #DEBUG
             PubSub.subscribe(self, {"user_info":self.user_info, 
                                     "server_info":self.server_info})
+            room_msg = self.generate_room_msg()
+            room_msg["username"] = self.user_info["username"]
+            PubSub.put_msg_into_publish_queue((room_msg, self))
             return True
 
         def handle_pubmsg(self, message):
@@ -347,11 +370,34 @@ class MRCStreamHandler(socketserver.BaseRequestHandler):
             PubSub.put_msg_into_publish_queue((screenshot, self))
             return True
 
+        def handle_entrance(self, message):
+            pass
+
+        def handle_exit(self, _exit):
+            pass
+
         def handle_quit(self, timout_msg):
             """Handle a connection quitting or timing out."""
             self.request.close()
             
+        def generate_room_msg(self):
+            """Generate a room type message and return it.
 
+            A room message is of the form:
+
+            {"type":"room",
+             "users":<LIST OF STRINGS REPRESENTING USERNAMES>,
+             "topic":<STRING REPRESENTING THE CURRENT ROOM TOPIC>}
+            """
+            users = []
+            for subscriber in PubSub.Subscriptions:
+                users.append(
+                    PubSub.Subscriptions[subscriber]["user_info"]["username"])
+            #TODO: Implement topic.
+            topic = "PLACEHOLDER TOPIC"
+            return {"type":"room",
+                    "users":users,
+                    "topic":topic}
         
 class StreamError(Exception):
     """Errors related to handling MRC streams."""
@@ -394,6 +440,14 @@ class JSONDecodeError(Exception):
     def __str__(self):
         return repr(self.invalid_json)
 
+class ImproperHandlingError(Exception):
+    """Error raised when a message handler has improperly handled a message."""
+    def __init__(self, error_cause="No error info was given.", 
+                 error_msg="No error message was given."):
+        self.error_cause = error_cause
+        self.error_msg = error_msg
+    def __str__(self):
+        return repr((self.error_msg, self.error_cause))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
