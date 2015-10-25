@@ -39,6 +39,7 @@ class QuestionAnswerSystemClient(QWidget):
         self.user_list = QVBoxLayout()
         self.user_list_label = QLabel("Users", self)
         self.user_list_label.setFrameStyle(QFrame.Box | QFrame.Plain)
+        self.user_list_dict = dict()
         self.user_list.addWidget(self.user_list_label, alignment=Qt.AlignTop)
         self.chat_core.addWidget(self.discussion_view)
         self.chat_core.addLayout(self.user_list)
@@ -87,6 +88,35 @@ class QuestionAnswerSystemClient(QWidget):
         scroll = self.discussion_view.verticalScrollBar()
         scroll.triggerAction(scroll.SliderToMaximum)
         return True
+
+    def update_on_room(self, wrapped_msg):
+        """Update the display when the user enters the room. Room messages are of
+        the following form:
+
+        {"type":"room",
+         "users":<LIST OF STRINGS REPRESENTING USERNAMES>,
+         "topic":<STRING REPRESENTING THE CURRENT ROOM TOPIC>}
+         """
+        message = wrapped_msg[1]
+        for user in message["users"]:
+            self.user_list_dict[user] = QLabel(user, self)
+            self.user_list.addWidget(self.user_list_dict[user], alignment=Qt.AlignTop)
+        self.discussion_topic = QLabel(message["topic"], self)
+        return True
+
+    def update_on_entrance(self, wrapped_msg):
+        """Update the display when a user enters the room. Entrance messages are
+        of the following form:
+
+        {"type":"entrance",
+         "username":<STRING REPRESENTING USERNAME>,
+         "timestamp":<UNIX TIMESTAMP>}
+        """
+        entrance = wrapped_msg[1]
+        
+
+    def update_on_exit(self, wrapped_msg):
+        pass
 
     @Slot(str, result=bool) 
     def send_msg_to_room(self):
