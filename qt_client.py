@@ -4,12 +4,13 @@ from PySide.QtGui import *
 import json
 import queue
 import sys
+import argparse
 
 
 class QuestionAnswerSystemClient(QWidget):
-    def __init__(self):
+    def __init__(self, hostname="localhost"):
         self.logic = QAClientLogic()
-        self.logic.connect(hostname="localhost")
+        self.logic.connect(hostname=hostname)
         self.logic.logon()
         self.config = self.read_config(self.logic.confpath)
         QWidget.__init__(self)
@@ -147,8 +148,13 @@ class QuestionAnswerSystemClient(QWidget):
         self.raise_()
         return True
 
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--host", default="localhost", 
+                        help="The host to connect to.")
+    arguments = parser.parse_args()
     qt_app = QApplication(sys.argv)
-    qa_client = QuestionAnswerSystemClient()
+    qa_client = QuestionAnswerSystemClient(arguments.host)
     qa_client.show_and_raise()
     sys.exit(qt_app.exec_())
