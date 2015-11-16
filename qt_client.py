@@ -3,6 +3,8 @@ from PySide.QtCore import *
 from PySide.QtGui import *
 import json
 import queue
+import time
+import datetime
 import sys
 import argparse
 
@@ -82,7 +84,8 @@ class QuestionAnswerSystemClient(QWidget):
 
     def update_on_pubmsg(self, wrapped_msg):
         pubmsg = wrapped_msg[1]
-        pubmsg_text = (str(pubmsg["timestamp"]) + 
+        hh_mm = self.convert_and_extract_hh_mm(pubmsg["timestamp"])
+        pubmsg_text = (hh_mm + 
                        " <" + str(pubmsg["username"]) + "> " 
                        + str(pubmsg["msg"]))
         self.append_text(pubmsg_text, self.discussion_view_cursor)
@@ -148,6 +151,12 @@ class QuestionAnswerSystemClient(QWidget):
         self.raise_()
         return True
 
+    def convert_and_extract_hh_mm(self, unix_timestamp):
+        """Convert a POSIX timestamp to a python datetime object in local time
+        and then return a string representing the HH:MM of the stamp."""
+        datetime_timestamp = datetime.datetime.fromtimestamp(unix_timestamp)
+        return datetime_timestamp.strftime("%H:%M")
+        
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
