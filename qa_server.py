@@ -3,6 +3,8 @@ import socket
 import select
 import threading
 import queue
+import time
+import calendar
 import json
 import argparse
 
@@ -65,7 +67,7 @@ class PublishSubscribe():
             print("Pubsub got a message!") #DEBUG
             message = message_tuple[0]
             connection = message_tuple[1]
-            message["timestamp"] = None # Need to add later.
+            message["timestamp"] = calendar.timegm(time.gmtime())
             try:
                 if not message["username"]: # Reject messages from clients which have not logged in
                     print("Not logged in.") #DEBUG
