@@ -60,8 +60,6 @@ class PublishSubscribe():
         The message is grabbed, then the privilege checks are applied, finally
         if applicable the message is sent to the entire subscriber list.
         """
-        # TODO: Write a system that lets you have functions to generate lists of
-        # subscribers to send a message to based on its type and contents.
         while True:
             message_tuple = self.Messages.get()
             print("Pubsub got a message!") #DEBUG
