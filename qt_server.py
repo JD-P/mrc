@@ -3,6 +3,7 @@ from PySide.QtCore import *
 from PySide.QtGui import *
 import sys
 import os
+import platform
 import threading
 
 class DesktopQAServerController():
