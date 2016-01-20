@@ -1,6 +1,7 @@
 from Crypto.PublicKey import DSA
 from Crypto.Hash import SHA256
 from Crypto.Random import random
+import socket
 import base64
 
 class QAKey(DSA):
@@ -26,8 +27,9 @@ class QAKey(DSA):
         q = int(pubkey_vars[3])
         return self.construct((y,g,p,q))
 
-    def fingerprint(self, base64_pub):
+    def fingerprint(self, key):
         """Return a SHA256 fingerprint of a base64 encoded public key."""
+        base64_pub = self.base64_pub_encode(key)
         return SHA256.new(base64_pub.encode('utf-8')).digest()
         
 
@@ -59,19 +61,20 @@ class ServerAddressBook():
     def __init__(self):
         self.book = dict()
         
-    def add_server(self, base64_pub):
+    def add_server(self, key):
+        base64_pub = QAKey.base64_pub_encode(key)
         if base64_pub not in self.book:
             self.book[base64_pub] = set()
         else:
             return False
 
-    def add_address(self, base64_pub, ip_address, timestamp, signature):
+    def add_address(self, key, ip_address, timestamp, signature):
         """Add an address to the list that a server has hosted at. Each address
         includes a timestamp of when the server signed it so that it's easy to
         sort and determine what the most recent address is. The dialer goes
         through each entry in this list in the case of a disconnection or failure
         to connect."""
-        key = QAKey.base64_pub_decode(base64_pub)
+        base64_pub = QAKey.base64_pub_encode(key)
         digest = SHA256.new(ip_address + str(timestamp)).digest()
         if not key.verify(digest, signature):
             return False
@@ -80,15 +83,20 @@ class ServerAddressBook():
         else:
             return False
 
-    def remove_server(self, base64_pub):
+    def remove_server(self, key):
+        base64_pub = QAKey.base64_pub_encode(key)
         if base64_pub in self.book:
             self.book.pop(base64_pub)
             return True
         else:
             return False
 
-    def list_by_key(self, base64_pub):
-        
+    def list_by_key(self, key):
+        base64_pub = QAKey.base64_pub_encode(key)
+        if base64_pub in self.book:
+            return self.book[base64_pub]
+        else:
+            return False
 
 class Dialer():
     """Implements the callback function of the QA p2p system. This class handles 
@@ -111,3 +119,11 @@ class Dialer():
         self._address_book = address_book
         self._client_list = client_list
         self._key = key
+
+    def callback(self):
+        server_addresses = address_book.list_by_key(key)
+        for address in server_addresses:
+            self.dial(address)
+
+    def dial(self, address):
+        
