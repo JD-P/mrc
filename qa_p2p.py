@@ -102,18 +102,6 @@ class Dialer():
     """Implements the callback function of the QA p2p system. This class handles 
     client dialing by default, but the subclass ServerDialer handles the callback
     function from the server side.
-
-    When a connection is lost to the server, the dial() method goes through the 
-    ServerAddressBook associated with this object to try every IP address the 
-    server is known to have hosted from. If this fails it then goes through and 
-    tries connecting to each client address in the ClientList. If successful it
-    will ask the client for its most recent address entry for the server in the 
-    ServerAddressBook. The client will then validate this entry using its copy of
-    the server key.
-
-    If an entry is valid and not already in the book it will be added and tried.
-    Finally if this process fails to yield the server address the client will need
-    to be reconfigured manually. Otherwise dial() returns the servers new address.
     """
     def __init__(self, address_book, client_list, key):
         self._address_book = address_book
@@ -121,9 +109,28 @@ class Dialer():
         self._key = key
 
     def callback(self):
-        server_addresses = address_book.list_by_key(key)
-        for address in server_addresses:
-            self.dial(address)
-
-    def dial(self, address):
+        """
+        When a connection is lost to the server, the callback() method goes through the 
+        ServerAddressBook associated with this object to try every IP address the 
+        server is known to have hosted from. If this fails it then goes through and 
+        tries connecting to each client address in the ClientList. If successful it
+        will ask the client for its most recent address entry for the server in the 
+        ServerAddressBook. The client will then validate this entry using its copy of
+        the server key.
         
+        If an entry is valid and not already in the book it will be added and tried.
+        Finally if this process fails to yield the server address the client will need
+        to be reconfigured manually. Otherwise dial() returns the servers new address.
+        server_addresses = address_book.list_by_key(key)
+        """
+        for address in server_addresses:
+            try:
+                connection = socket.create_connection((address, 9665))
+                self.verify(connection)
+            except socket.error:
+                continue
+            
+
+    def verify(self, connection):
+        """Request the server send a signed verification of its identity with 
+        IP address and timestamp."""
