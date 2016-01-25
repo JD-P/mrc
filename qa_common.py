@@ -17,7 +17,7 @@ class Configuration:
     def __setitem__(self, key, item):
         self._data[key] = item
 
-    def save():
+    def save(self):
         """Save the changes made to the configuration to the config file."""
         config_file = open(self._filepath, "w")
         json.dump(self._data, config_file)
