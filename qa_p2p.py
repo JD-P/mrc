@@ -1,3 +1,4 @@
+from qa_common import Configuration
 from Crypto.PublicKey import DSA
 from Crypto.Hash import SHA256
 from Crypto.Random import random
@@ -58,8 +59,12 @@ class ClientList():
 class ServerAddressBook():
     """An address book containing the key for a server and all the addresses the 
     server is known to have used."""
-    def __init__(self):
-        self.book = dict()
+    def __init__(self, configuration):
+        if 'server_address_book' in configuration:
+            self.book = configuration['server_address_book']
+        else:
+            self.book = dict()
+        self._configuration = configuration
         
     def add_server(self, key):
         base64_pub = base64_pub_encode(key)
@@ -75,7 +80,9 @@ class ServerAddressBook():
         through each entry in this list in the case of a disconnection or failure
         to connect."""
         base64_pub = base64_pub_encode(key)
-        digest = SHA256.new(ip_address + "," + str(port) + "," + str(timestamp)).digest()
+        digest = SHA256.new(
+            str(ip_address) + "," + str(port) + "," +
+            str(timestamp).encode('utf-8')).digest()
         if not key.verify(digest, signature):
             return False
         if (ip_address, timestamp, signature) not in self.book[base64_pub]:
@@ -91,6 +98,10 @@ class ServerAddressBook():
         else:
             return False
 
+    def save(self):
+        self._configuration['server_address_book'] = self.book
+        return self._configuration.save()
+        
     def list_by_key(self, key):
         base64_pub = base64_pub_encode(key)
         if base64_pub in self.book:
@@ -242,7 +253,20 @@ class P2PNode(socketserver.ThreadingMixIn, socketserver.TCPServer):
         resolves the issue using provided client logic methods and clears the 
         error indicator."""
         if self._client_logic.connection_error.is_set():
-            SHA256.new(str(message['ip_addr']) + str(message['port'])
+            try:
+                ip_addr = message['ip_addr']
+                port = message['port']
+                timestamp = message['timestamp']
+                signature = message['signature']
+            except KeyError:
+                return False
+            sha_hash = SHA256.new(
+                (ip_addr + "," + port + "," + timestamp).encode('utf-8'))
+            if self._key.verify(sha_hash.digest(), signature):
+                self._address_book.add_address(self._key, ip_addr, timestamp,
+                                               signature, port=port)
+                self._address_book.save()
+                #STOPPOINT - Left off here 2016/01/24
         else:
             return False
         return True
