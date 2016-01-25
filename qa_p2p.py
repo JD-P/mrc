@@ -134,11 +134,14 @@ class P2PNode(socketserver.ThreadingMixIn, socketserver.TCPServer):
         server_addresses = address_book.list_by_key(key)
         """
         for address in server_addresses:
-            try:
-                connection = socket.create_connection((address, 9665))
-                self.sident_verify(connection)
-            except socket.error:
-                continue
+            if self._client_logic.connection_error.is_set():
+                try:
+                    connection = socket.create_connection((address, 9665))
+                    self.sident_verify(connection, v_event)
+                except socket.error:
+                    continue
+            else:
+                return True
             
 
     def sident_verify(self, connection):
@@ -162,23 +165,25 @@ class P2PNode(socketserver.ThreadingMixIn, socketserver.TCPServer):
                       CONCATENATED TOGETHER WITH COMMA SEPERATORS>}
         """
         sident_verify_msg = {'type':'sident_verify'}
-        self._send_queue.put(sident_verify_msg)
+        self._send_queue.put((sident_verify_msg, connection))
         return True
 
     def send_loop(self):
         """Send loop that is meant to be started from a seperate thread of 
         execution. The send loop pulls 'raw' python object messages from this 
         objects send_queue attribute and converts them to json strings before 
-        encoding them as utf-8 to send across the wire.
+        encoding them as utf-8 to send across the wire. Sent along with the 
+        message is the connection to send it on.
 
         Responses are handled and received by the receive_loop method of this class
         which is ran in a seperate thread of execution."""
         while not self._shutdown.is_set():
-            message = self._send_queue.get()
+            message_tuple = self._send_queue.get()
+            message = message_tuple[0]
             message_length = self._calculate_recursive_length(message)
             wrapped_message = [message_length, message]
             wire_message = (json.dumps(wrapped_message) + "\r\n\r\n").encode('utf-8')
-            self.connection.sendall(wire_message)
+            message_tuple[1].sendall(wire_message)
         return True
 
     def receive_loop(self):
@@ -278,3 +283,19 @@ class P2PNode(socketserver.ThreadingMixIn, socketserver.TCPServer):
                 json.dumps(recursive_list) + delimiter)
             recursive_list = [recursive_length, msg_dict]
         return recursive_list[0]
+
+    class VerificationEvent(threading.Event):
+        """Subclass of event that keeps track of whether a connection attempt
+        resulted in a verified connection to the server."""
+        def __init__(self):
+            super.__init__(self)
+            self.success = None
+            
+        def success(self):
+            self.success = True
+            
+        def failure(self):
+            self.success = False
+            
+        def succeeded(self):
+            return self.success
