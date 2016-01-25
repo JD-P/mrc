@@ -9,29 +9,39 @@ import queue
 import base64
 import json
 
-def base64_pub_encode(self, key):
-    """Return a base64 representation of the public key. The representation is
-    just the variables y g p q concatenated together with colon seperators
-    and then encoded."""
-    (y, g, p, q) = (str(key.y), str(key.g), str(key.p), str(key.q))
-    return base64.b64encode((y + "," + g + "," + p + "," + q).encode('utf-8')).decode('utf-8')
+class QAKey:
+    """Namespace class that groups together functions used by the qa system to 
+    manipulate DSA keys."""
+    def __init__(self):
+        raise RuntimeError("QAKey is a namespace class, it is not meant to be"
+                           " instantiated as an object.")
 
-def base64_pub_decode(self, base64_pub):
-    """Return a tuple with the variables y g p q given a base64 representation
-    of a DSA public key."""
-    base64_pub_bytes = base64_pub.encode('utf-8')
-    pubkey_text = base64.b64decode(base64_pub_bytes)
-    pubkey_vars = pubkey_text.split(":")
-    y = int(pubkey_vars[0])
-    g = int(pubkey_vars[1])
-    p = int(pubkey_vars[2])
-    q = int(pubkey_vars[3])
-    return DSA.construct((y,g,p,q))
+    @classmethod
+    def base64_pub_encode(self, key):
+        """Return a base64 representation of the public key. The representation is
+        just the variables y g p q concatenated together with colon seperators
+        and then encoded."""
+        (y, g, p, q) = (str(key.y), str(key.g), str(key.p), str(key.q))
+        return base64.b64encode((y + "," + g + "," + p + "," + q).encode('utf-8')).decode('utf-8')
 
-def fingerprint(self, key):
-    """Return a SHA256 fingerprint of a base64 encoded public key."""
-    base64_pub = self.base64_pub_encode(key)
-    return SHA256.new(base64_pub.encode('utf-8')).digest()
+    @classmethod
+    def base64_pub_decode(self, base64_pub):
+        """Return a tuple with the variables y g p q given a base64 representation
+        of a DSA public key."""
+        base64_pub_bytes = self.base64_pub.encode('utf-8')
+        pubkey_text = base64.b64decode(base64_pub_bytes)
+        pubkey_vars = pubkey_text.split(":")
+        y = int(pubkey_vars[0])
+        g = int(pubkey_vars[1])
+        p = int(pubkey_vars[2])
+        q = int(pubkey_vars[3])
+        return DSA.construct((y,g,p,q))
+
+    @classmethod
+    def fingerprint(self, key):
+        """Return a SHA256 fingerprint of a base64 encoded public key."""
+        base64_pub = self.base64_pub_encode(key)
+        return SHA256.new(base64_pub.encode('utf-8')).digest()
         
 
 class ClientList():
