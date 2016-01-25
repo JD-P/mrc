@@ -283,19 +283,3 @@ class P2PNode(socketserver.ThreadingMixIn, socketserver.TCPServer):
                 json.dumps(recursive_list) + delimiter)
             recursive_list = [recursive_length, msg_dict]
         return recursive_list[0]
-
-    class VerificationEvent(threading.Event):
-        """Subclass of event that keeps track of whether a connection attempt
-        resulted in a verified connection to the server."""
-        def __init__(self):
-            super.__init__(self)
-            self.success = None
-            
-        def success(self):
-            self.success = True
-            
-        def failure(self):
-            self.success = False
-            
-        def succeeded(self):
-            return self.success
