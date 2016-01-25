@@ -226,7 +226,28 @@ class P2PNode(socketserver.ThreadingMixIn, socketserver.TCPServer):
                     msg_buffer += connection.recv(1024)
                 except socket.timeout:
                     pass
+    
+    def handle_sident_response(message):
+        """Handle an sident_response type message of the form:
+        
+        {'type':'sident_response',
+         'ip_addr':<IP ADDRESS AS A STRING>,
+         'port':<PORT NUMBER AS AN INTEGER>,
+         'timestamp':<UNIX TIMESTAMP>,
+         'signature':<SIGNED DIGEST OF THE THREE PREVIOUS VALUES AS A UTF-8 STRING 
+                      CONCATENATED TOGETHER WITH COMMA SEPERATORS>}
+        
+        The handler verifies that the information given by the server is properly
+        signed, then adds the information to address books/etc, and finally 
+        resolves the issue using provided client logic methods and clears the 
+        error indicator."""
+        if self._client_logic.connection_error.is_set():
+            SHA256.new(str(message['ip_addr']) + str(message['port'])
+        else:
+            return False
+        return True
 
+    
     def determine_length_of_json_msg(self, message_bytes):
         """Incrementally parse a JSON message to extract the length header.
 
@@ -283,3 +304,51 @@ class P2PNode(socketserver.ThreadingMixIn, socketserver.TCPServer):
                 json.dumps(recursive_list) + delimiter)
             recursive_list = [recursive_length, msg_dict]
         return recursive_list[0]
+
+class StreamError(Exception):
+    """Errors related to handling MRC streams."""
+    pass
+
+class ConnectionError(StreamError):
+    """Error raised when a connection is broken or nonexistent."""
+    def __init__(self, error_message):
+        self.error_message = error_message
+    def __str__(self):
+        return repr(self.error_message)
+
+class LengthHeaderError(StreamError):
+    """Abstract length header error class."""
+    def __init__(self, length_portion="Portion not given"):
+        self.length_portion = length_portion
+    def __str__(self):
+        return repr(self.length_portion)
+
+class MissingLengthHeader(LengthHeaderError):
+    """Error raised when a length header appears to be missing."""
+    pass
+
+class InvalidLengthHeader(LengthHeaderError):
+    """Error raised when a length header appears to be present but
+    garbled."""
+    pass
+
+class MessageDelimiterError(LengthHeaderError):
+    """Abstract message delimiter error class."""
+    pass
+
+class MissingMessageDelimiter(MessageDelimiterError):
+    """Error raised when a message delimiter appears to be missing."""
+    pass
+
+class InvalidMessageDelimiter(MessageDelimiterError):
+    """Error raised when a message delimiter appears to be present but
+    garbled."""
+    pass
+
+class JSONDecodeError(Exception):
+    """Error raised when a json encoded message fails to decode to a valid JSON
+    document."""
+    def __init__(self, invalid_json="JSON not given."):
+        self.invalid_json = invalid_json
+    def __str__(self):
+        return repr(self.invalid_json)
