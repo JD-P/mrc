@@ -42,7 +42,7 @@ class ClientList():
         self._neighbors = set()
 
     def add(self, address):
-        if type(address) != type(str()):
+        if type(address) != str:
             raise self.IPAddError("Expected IP address to be of type string.")
         self._neighbors.add(address)
 
