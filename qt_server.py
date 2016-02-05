@@ -32,7 +32,7 @@ class DesktopQAServerController():
         """Shutdown the server when directed from the system tray icon."""
         server.shutdown()
         server.server_close()
-        sys.exit()
+        quit()
 
 class ServerThread(threading.Thread):
     def run(self):
