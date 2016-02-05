@@ -120,12 +120,10 @@ class ServerAddressBook():
             return False
 
 class P2PNode(socketserver.ThreadingMixIn, socketserver.TCPServer):
-:
     """Implements the callback function of the QA p2p system. (For a description
     of this function see the callback() method.) This class handles client dialing 
     by default, but the subclass ServerNode handles the callback function from 
-    the server side.
-    """
+    the server side."""
     def __init__(self, client_logic, address_book, client_list, key):
         self._client_logic = client_logic
         self._address_book = address_book
@@ -276,10 +274,13 @@ class P2PNode(socketserver.ThreadingMixIn, socketserver.TCPServer):
                 self._address_book.add_address(self._key, ip_addr, timestamp,
                                                signature, port=port)
                 self._address_book.save()
-                #STOPPOINT - Left off here 2016/01/24
+                if self._client_logic.reconnect(ip_addr, port):
+                    self._client_logic.connection_error.clear()
+                    return True
+                else:
+                    return False
         else:
             return False
-        return True
 
     
     def determine_length_of_json_msg(self, message_bytes):
